@@ -1,0 +1,5 @@
+qai-hub-models[cavaface]
+opencv-python
+numpy
+pillow
+pyserial

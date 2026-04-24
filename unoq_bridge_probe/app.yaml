@@ -1,0 +1,3 @@
+name: Face Guard Hardware Probe
+icon: 🔎
+description: Probe Modulino Distance and Buzzer through Arduino Router Bridge.
