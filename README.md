@@ -97,6 +97,97 @@ python enroll_faces.py --name current_user --camera --samples 8 --camera-index 0
 
 Enrollment creates `laptop_ai_guard/known_faces/embeddings.npz`.
 
+## How Known Faces Are Stored
+
+Known faces are stored locally in a compressed NumPy file:
+
+```text
+laptop_ai_guard/known_faces/embeddings.npz
+```
+
+That file contains two arrays:
+
+```text
+names       shape: (N,)
+embeddings  shape: (N, 512)
+```
+
+Each row in `embeddings` is one normalized CavaFace face embedding. The matching
+entry in `names` is the label for that embedding.
+
+Example:
+
+```text
+names[0]          = "current_user"
+embeddings[0, :]  = 512-d face vector for current_user sample 1
+
+names[1]          = "current_user"
+embeddings[1, :]  = 512-d face vector for current_user sample 2
+
+names[2]          = "guest"
+embeddings[2, :]  = 512-d face vector for guest sample 1
+```
+
+At runtime, the app creates a new embedding for the detected face and computes
+cosine similarity against every stored row:
+
+```python
+scores = stored_embeddings @ query_embedding
+best_index = scores.argmax()
+```
+
+If the best score is greater than or equal to `--threshold`, the face is treated
+as known and the buzzer stays silent. Otherwise, the app calls `buzz_unknown` on
+the UNO Q firmware.
+
+### Add Known Faces With The Script
+
+The preferred way to add known faces is `enroll_faces.py`, because it detects the
+face, crops it, runs CavaFace, normalizes the embedding, appends it to the array,
+and saves the `.npz` file.
+
+```bash
+python enroll_faces.py --name current_user \
+  --image ./captures/current_user_1.jpg \
+  --image ./captures/current_user_2.jpg
+```
+
+The script appends rows like this internally:
+
+```python
+database = FaceDatabase.load("known_faces/embeddings.npz")
+database.add_many("current_user", embeddings)
+database.save("known_faces/embeddings.npz")
+```
+
+Use multiple images per person. More samples help the cosine matcher handle
+different lighting, distance, head angle, and camera quality.
+
+### Inspect The Known-Face Array
+
+You can inspect the stored labels and array shape:
+
+```bash
+python - <<'PY'
+import numpy as np
+
+data = np.load("known_faces/embeddings.npz", allow_pickle=False)
+print(data["names"].tolist())
+print(data["embeddings"].shape)
+PY
+```
+
+### Reset The Known-Face Dataset
+
+To start over, delete the generated `.npz` file and enroll again:
+
+```bash
+rm laptop_ai_guard/known_faces/embeddings.npz
+```
+
+Do not commit `embeddings.npz` to git. It contains biometric face templates and
+is ignored by this repository on purpose.
+
 ## Run The Guard
 
 The current working path uses UNO Q RouterBridge plus a browser camera bridge.
